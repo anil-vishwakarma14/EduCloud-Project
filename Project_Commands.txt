@@ -1,0 +1,287 @@
+EDUCLOUD PROJECT - LINUX COMMANDS + CONFIG + CODE
+
+----------------------------
+1. SYSTEM SETUP AND PACKAGES
+----------------------------
+ yum update -y
+
+ yum install -y httpd
+ yum install -y php
+ yum install -y php-mysqlnd
+ yum install MariaDB105 -y
+ yum install -y nfs-utils
+ yum install -y vsftpd
+ yum install -y lvm2
+ yum install -y cryptsetup
+ yum install -y acl
+ yum install -y aws-cli
+
+ systemctl start httpd
+ systemctl enable httpd
+
+ systemctl start nfs-server
+ systemctl enable nfs-server
+
+ systemctl start vsftpd
+ systemctl enable vsftpd
+
+ systemctl enable httpd
+ systemctl start httpd
+ systemctl status httpd
+
+----------------------------
+2. USERS AND GROUPS
+----------------------------
+ groupadd trainers
+ groupadd students
+ groupadd support
+
+ useradd -m -G trainers trainer1
+ useradd -m -G trainers trainer2
+ useradd -m -G students student1
+ useradd -m -G students student2
+ useradd -m -G students student3
+ useradd -m -G support support1
+
+ passwd trainer1
+ passwd trainer2
+ passwd student1
+ passwd student2
+ passwd student3
+ passwd support1
+
+----------------------------
+3. PASSWORD POLICY
+----------------------------
+ chage -M 30 trainer1
+ chage -M 30 trainer2
+ chage -M 30 student1
+ chage -M 30 student2
+ chage -M 30 student3
+ chage -M 30 support1
+
+ nano /etc/security/pwquality.conf
+
+minlen = 10
+ucredit = -1
+dcredit = -1
+ocredit = -1
+lcredit = 0
+
+----------------------------
+4. DIRECTORIES
+----------------------------
+ mkdir /materials
+ mkdir /assignments
+ mkdir /logs
+ mkdir /training_data
+ mkdir /sensitive_data
+
+----------------------------
+5. PERMISSIONS
+----------------------------
+ chown root:trainers /materials
+ chown root:students /assignments
+ chown root:trainers /logs
+
+ chmod 775 /materials
+ chmod 775 /assignments
+ chmod 770 /logs
+
+----------------------------
+6. ACL
+----------------------------
+ setfacl -m g:trainers:rwx /materials
+ setfacl -m g:students:rx /materials
+
+ setfacl -m g:students:rwx /assignments
+ setfacl -m g:trainers:rx /assignments
+
+ setfacl -m g:support:rx /logs
+ setfacl -m g:trainers:rwx /logs
+ setfacl -m g:students:--- /logs
+
+----------------------------
+7. FILE HANDLING
+----------------------------
+
+tar -czf materials_backup.tar.gz /materials
+tar -czf assignments_backup.tar.gz /assignments
+tar -czf logs_backup.tar.gz /logs
+
+----------------------------
+8. AWS CLI
+----------------------------
+aws configure
+
+aws s3 cp materials_backup.tar.gz s3://educloud-materials-yourname/
+aws s3 cp logs_backup.tar.gz s3://educloud-backup-yourname/
+
+----------------------------
+9. CRON JOBS
+----------------------------
+sudo crontab -u trainer1 -e
+0 23 * * * aws s3 cp materials_backup.tar.gz s3://educloud-materials-yourname/
+
+sudo crontab -u support1 -e
+0 18 * * 0 aws s3 cp logs_backup.tar.gz s3://educloud-backup-yourname/
+
+sudo crontab -u trainer2 -e
+30 0 1 * * echo "Assignments archived"
+
+----------------------------
+10. LVM
+----------------------------
+lsblk
+
+ pvcreate /dev/xvdb
+ vgcreate training_vg /dev/xvdb
+ lvcreate -L 5G -n training_lv training_vg
+
+ mkfs.xfs /dev/training_vg/training_lv
+ mount /dev/training_vg/training_lv /training_data
+
+ lvextend -L 10G /dev/training_vg/training_lv
+ xfs_growfs /training_data
+
+----------------------------
+11. LUKS
+----------------------------
+ cryptsetup luksFormat /dev/xvdc
+ cryptsetup luksOpen /dev/xvdc sensitive_crypt
+
+ mkfs.xfs /dev/mapper/sensitive_crypt
+ mount /dev/mapper/sensitive_crypt /sensitive_data
+
+----------------------------
+12. NFS
+----------------------------
+ nano /etc/exports
+
+/materials *(rw,sync,no_root_squash)
+
+ systemctl enable nfs-server
+ systemctl start nfs-server
+ exportfs -rav
+ exportfs -v
+----------------------------
+13. FTP
+----------------------------
+ nano /etc/vsftpd/vsftpd.conf
+
+anonymous_enable=NO
+local_enable=YES
+write_enable=YES
+chroot_local_user=YES
+allow_writeable_chroot=YES
+ssl_enable=YES
+pasv_enable=YES
+pasv_min_port=40000
+pasv_max_port=50000
+
+sudo systemctl enable vsftpd
+sudo systemctl restart vsftpd
+
+----------------------------
+14. WEB PORTAL
+----------------------------
+ nano /var/www/html/index.html
+ nano /var/www/html/upload.php
+ nano /var/www/html/materials.php
+ nano /var/www/html/submit.php
+
+index.html
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>EduCloud Portal</title>
+</head>
+<body>
+<h1>EduCloud Portal</h1>
+
+<form action="upload.php" method="post" enctype="multipart/form-data">
+<input type="file" name="file">
+<input type="submit" value="Upload">
+</form>
+
+<a href="materials.php">View Materials</a>
+
+<form action="submit.php" method="post" enctype="multipart/form-data">
+<input type="text" name="studentname">
+<input type="file" name="assignment">
+<input type="submit" value="Submit">
+</form>
+
+</body>
+</html>
+
+----------------------------
+upload.php
+----------------------------
+<?php
+$target = "/materials/" . basename($_FILES["file"]["name"]);
+move_uploaded_file($_FILES["file"]["tmp_name"], $target);
+echo "Uploaded";
+?>
+
+----------------------------
+materials.php
+----------------------------
+<?php
+$files = scandir("/materials");
+foreach($files as $file){
+if($file != "." && $file != ".."){
+echo "<a href='/downloads/$file'>$file</a><br>";
+}}
+?>
+
+----------------------------
+submit.php
+----------------------------
+<?php
+$student = $_POST['studentname'];
+$file = $_FILES["assignment"]["name"];
+
+if(substr($file, -7) != ".tar.gz"){
+echo "Only tar.gz allowed";
+exit;
+}
+
+$target = "/assignments/" . $file;
+
+if(move_uploaded_file($_FILES["assignment"]["tmp_name"], $target)){
+echo "Submitted";
+
+$conn = new mysqli("RDS_ENDPOINT","admin","PASSWORD","educloud_db");
+$sql = "INSERT INTO uploads (filename, uploader) VALUES ('$file','$student')";
+$conn->query($sql);
+}
+?>
+
+----------------------------
+15. BIND MOUNT
+----------------------------
+sudo mkdir -p /var/www/html/downloads
+sudo mount --bind /materials /var/www/html/downloads
+
+sudo nano /etc/fstab
+/materials /var/www/html/downloads none bind 0 0
+
+----------------------------
+16. MYSQL
+----------------------------
+mysql -h RDS_ENDPOINT -u admin -p
+
+USE educloud_db;
+
+CREATE TABLE uploads (
+id INT AUTO_INCREMENT PRIMARY KEY,
+filename VARCHAR(255),
+uploader VARCHAR(100)
+);
+
+----------------------------
+17. API TEST
+----------------------------
+curl -X POST https://your-api-url/submitAssignment
