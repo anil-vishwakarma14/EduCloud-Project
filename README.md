@@ -10,8 +10,11 @@ LinkedIn: https:https://www.linkedin.com/in/anil-vishwakarma14?utm_source=share_
 
 # Project Overview
 
-EduCloud is a cloud-based file sharing system designed for trainers and students.
-It provides secure access to study materials, assignment submission, and automated backup using AWS and Linux.
+EduCloud is a web-based application developed using HTML and PHP that runs on a Linux server hosted in AWS. It provides a platform where trainers can upload study materials and students can download them and submit assignments.
+The system uses AWS services like S3 for storing files, RDS for database management, and Load Balancer with Auto Scaling to handle multiple users efficiently.
+Security is maintained using Linux permissions, ACL, IAM roles, and security groups, ensuring only authorized users can access the data.
+Overall, EduCloud is designed to be secure, scalable, and easy to use for both trainers and students.
+
 
 ---
 
