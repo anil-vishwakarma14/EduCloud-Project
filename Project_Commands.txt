@@ -1,0 +1,941 @@
+EDUCLOUD PROJECT - LINUX COMMANDS + CONFIG + CODE
+
+----------------------------
+1. SYSTEM SETUP AND PACKAGES
+----------------------------
+ yum update -y
+
+ yum install -y httpd
+ yum install -y php
+ yum install -y php-mysqlnd
+ yum install -y nfs-utils
+ yum install -y vsftpd
+ yum install -y lvm2
+ yum install -y cryptsetup
+ yum install -y acl
+ yum install -y aws-cli
+
+ systemctl start httpd
+ systemctl enable httpd
+
+ systemctl start nfs-server
+ systemctl enable nfs-server
+
+ systemctl start vsftpd
+ systemctl enable vsftpd
+
+ systemctl enable httpd
+ systemctl start httpd
+ systemctl status httpd
+
+----------------------------
+2. USERS AND GROUPS
+----------------------------
+ groupadd trainers
+ groupadd students
+ groupadd support
+
+ useradd -m -G trainers trainer1
+ useradd -m -G trainers trainer2
+ useradd -m -G students student1
+ useradd -m -G students student2
+ useradd -m -G students student3
+ useradd -m -G support support1
+
+ passwd trainer1
+ passwd trainer2
+ passwd student1
+ passwd student2
+ passwd student3
+ passwd support1
+
+----------------------------
+3. PASSWORD POLICY
+----------------------------
+ chage -M 30 trainer1
+ chage -M 30 trainer2
+ chage -M 30 student1
+ chage -M 30 student2
+ chage -M 30 student3
+ chage -M 30 support1
+
+ nano /etc/security/pwquality.conf
+
+minlen = 10
+ucredit = -1
+dcredit = -1
+ocredit = -1
+lcredit = 0
+
+----------------------------
+4. DIRECTORIES
+----------------------------
+ mkdir /materials
+ mkdir /assignments
+ mkdir /logs
+ mkdir /training_data
+ mkdir /sensitive_data
+
+----------------------------
+5. PERMISSIONS
+----------------------------
+ chown root:trainers /materials
+ chown root:students /assignments
+ chown root:trainers /logs
+
+ chmod 775 /materials
+ chmod 775 /assignments
+ chmod 770 /logs
+
+----------------------------
+6. ACL
+----------------------------
+ setfacl -m g:trainers:rwx /materials
+ setfacl -m g:students:rx /materials
+
+ setfacl -m g:students:rwx /assignments
+ setfacl -m g:trainers:rx /assignments
+
+ setfacl -m g:support:rx /logs
+ setfacl -m g:trainers:rwx /logs
+ setfacl -m g:students:--- /logs
+
+----------------------------
+7. FILE HANDLING
+----------------------------
+
+tar -czf materials_backup.tar.gz /materials
+tar -czf assignments_backup.tar.gz /assignments
+tar -czf logs_backup.tar.gz /logs
+
+----------------------------
+8. AWS CLI
+----------------------------
+aws configure
+
+aws s3 cp materials_backup.tar.gz s3://educloud-materials-yourname/
+aws s3 cp logs_backup.tar.gz s3://educloud-backup-yourname/
+
+----------------------------
+9. CRON JOBS
+----------------------------
+sudo crontab -u trainer1 -e
+0 23 * * * aws s3 cp materials_backup.tar.gz s3://educloud-materials-yourname/
+
+
+sudo crontab -u support1 -e
+0 18 * * 0 aws s3 cp logs_backup.tar.gz s3://educloud-backup-yourname/
+
+sudo crontab -u trainer2 -e
+30 0 1 * * echo "Assignments archived"
+
+----------------------------
+10. LVM
+----------------------------
+lsblk
+
+ pvcreate /dev/xvdb
+ vgcreate training_vg /dev/xvdb
+ lvcreate -L 5G -n training_lv training_vg
+
+ mkfs.xfs /dev/training_vg/training_lv
+ mount /dev/training_vg/training_lv /training_data
+
+ lvextend -L 10G /dev/training_vg/training_lv
+ xfs_growfs /training_data
+
+----------------------------
+11. LUKS
+----------------------------
+ cryptsetup luksFormat /dev/xvdc
+ cryptsetup luksOpen /dev/xvdc sensitive_crypt
+
+ mkfs.xfs /dev/mapper/sensitive_crypt
+ mount /dev/mapper/sensitive_crypt /sensitive_data
+
+         0r
+
+TO OPEN (DECRYPT)
+cryptsetup luksOpen /dev/nvme1n1 sensitive_crypt
+mount /dev/mapper/sensitive_crypt/senstive_data
+ls /sensitive_data
+
+TO CLOSE (ENCRYPT)
+umount /sensitive_data
+cryptsetup luksClose sensitive_crypt
+ls /dev/mapper
+----no output----
+----------------------------
+12. NFS
+----------------------------
+ 
+SERVER(Private1)
+
+dnf or yum install nfs-utils -y
+systemctl start nfs-server
+systemctl enable nfs-server
+nano /etc/exports
+
+/materials 10.0.2.9(rw,sync,no_subtree_check)
+systemctl restart nfs-server
+exportfs -v
+
+echo"nfs working">/materials/test.txt
+
+
+
+CLIENT(Privat2)
+
+dnf or yum install nfs-utils -y
+sudo mkdir -p /mnt/mayerials
+mount -v -t nfs 10.0.2.9 /materials/mnt/materials
+ls -l /mnt/materials
+
+
+----------------------------
+13. FTP
+----------------------------
+ SERVER(TRAINER)PRIAVTE1
+
+yum install -y vsftpd
+sudo systemctl start vsftpd
+sudo systemctl enable vsftpd
+
+nano /etc/vsftpd/vsftpd.conf
+
+anonymous_enable=NO
+local_enable=YES
+write_enable=YES
+chroot_local_user=YES
+local_root=/assigment
+allow_writeable_chroot=YES
+ssl_enable=YES
+pasv_enable=YES
+pasv_min_port=40000
+pasv_max_port=40010
+passv_address=10.0.2.9
+
+sudo systemctl restart vsftpd
+ls -l /assignments
+
+
+CLIENT(STUDENT)PRIAVTE2
+
+yum install lftp -y
+touch assignment1.tar.gz
+ls -l assignment1.tar.gz
+lftp -u student2 10.0.2.9
+put assignment1.tar.gz
+
+----------------------------
+14. WEB PORTAL
+----------------------------
+ nano /var/www/html/index.html
+ nano /var/www/html/upload.php
+ nano /var/www/html/materials.php
+ nano /var/www/html/submit.php
+
+index.html
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EduCloud Portal</title>
+</head>
+<body>
+    <h1>EduCloud Trainer Student Secure File Portal</h1>
+
+    <h2>Trainer Upload Materials</h2>
+    <form action="upload.php" method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" value="Upload">
+    </form>
+
+    <hr>
+
+    <h2>Student Download Materials</h2>
+    <a href="materials.php">Click here to view materials</a>
+
+    <hr>
+
+    <h2>Student Assignment Submission</h2>
+    <form action="submit.php" method="post" enctype="multipart/form-data">
+        Student Name:
+        <input type="text" name="studentname"><br><br>
+        <input type="file" name="assignment">
+        <input type="submit" value="Submit Assignment">
+    </form>
+</body>
+</html>
+
+
+-----------------------------OR--------------------------------
+(CHOOSE THIS )
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>EduCloud Portal</title>
+
+<style>
+
+\\\\\\\*{
+
+\\\&#x20;   margin:0;
+
+\\\&#x20;   padding:0;
+
+\\\&#x20;   box-sizing:border-box;
+
+\\\&#x20;   font-family:'Segoe UI',sans-serif;
+
+}
+
+
+
+body{
+
+\\\&#x20;   background:linear-gradient(135deg,#0f172a,#1e3a8a,#2563eb);
+
+\\\&#x20;   min-height:100vh;
+
+}
+
+
+
+.header{
+
+\\\&#x20;   background:rgba(255,255,255,0.1);
+
+\\\&#x20;   backdrop-filter:blur(12px);
+
+\\\&#x20;   padding:20px 40px;
+
+\\\&#x20;   color:white;
+
+\\\&#x20;   display:flex;
+
+\\\&#x20;   justify-content:space-between;
+
+\\\&#x20;   align-items:center;
+
+\\\&#x20;   border-bottom:1px solid rgba(255,255,255,0.2);
+
+}
+
+
+
+.logo{
+
+\\\&#x20;   font-size:30px;
+
+\\\&#x20;   font-weight:bold;
+
+}
+
+
+
+.user{
+
+\\\&#x20;   font-size:18px;
+
+}
+
+
+
+.container{
+
+\\\&#x20;   display:flex;
+
+\\\&#x20;   min-height:calc(100vh - 80px);
+
+}
+
+
+
+.sidebar{
+
+\\\&#x20;   width:240px;
+
+\\\&#x20;   background:rgba(255,255,255,0.08);
+
+\\\&#x20;   backdrop-filter:blur(10px);
+
+\\\&#x20;   padding:30px 20px;
+
+}
+
+
+
+.sidebar h3{
+
+\\\&#x20;   color:white;
+
+\\\&#x20;   margin-bottom:20px;
+
+}
+
+.sidebar ul{
+
+\\\&#x20;   list-style:none;
+
+}
+
+
+
+.sidebar ul li{
+
+\\\&#x20;   color:white;
+
+\\\&#x20;   padding:15px;
+
+\\\&#x20;   margin-bottom:10px;
+
+\\\&#x20;   border-radius:10px;
+
+\\\&#x20;   background:rgba(255,255,255,0.1);
+
+}
+
+
+
+.content{
+
+\\\&#x20;   flex:1;
+
+\\\&#x20;   padding:30px;
+
+}
+
+
+
+.welcome{
+
+\\\&#x20;   background:rgba(255,255,255,0.12);
+
+\\\&#x20;   color:white;
+
+\\\&#x20;   padding:25px;
+
+\\\&#x20;   border-radius:20px;
+
+\\\&#x20;   margin-bottom:25px;
+
+\\\&#x20;   backdrop-filter:blur(12px);
+
+}
+
+
+
+.cards{
+
+\\\&#x20;   display:grid;
+
+\\\&#x20;  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+
+\\\&#x20;   gap:25px;
+
+}
+
+
+
+.card{
+
+\\\&#x20;   background:rgba(255,255,255,0.95);
+
+\\\&#x20;   border-radius:20px;
+
+\\\&#x20;   padding:25px;
+
+\\\&#x20;   box-shadow:0 15px 30px rgba(0,0,0,0.15);
+
+\\\&#x20;   transition:0.3s;
+
+}
+
+
+
+.card:hover{
+
+\\\&#x20;   transform:translateY(-8px);
+
+}
+
+
+
+.card h2{
+
+\\\&#x20;   color:#1e40af;
+
+\\\&#x20;   margin-bottom:20px;
+
+}
+
+
+
+input\\\\\\\[type="text"]{
+
+\\\&#x20;   width:100%;
+
+\\\&#x20;   padding:12px;
+
+\\\&#x20;   border:1px solid #ccc;
+
+\\\&#x20;   border-radius:10px;
+
+}
+
+input\\\\\\\[type="file"]{
+
+\\\&#x20;   margin:15px 0;
+
+}
+
+
+
+input\\\\\\\[type="submit"]{
+
+\\\&#x20;   background:#2563eb;
+
+\\\&#x20;   color:white;
+
+\\\&#x20;   border:none;
+
+\\\&#x20;   padding:12px 22px;
+
+\\\&#x20;   border-radius:10px;
+
+\\\&#x20;   cursor:pointer;
+
+\\\&#x20;   font-weight:bold;
+
+}
+
+
+
+input\\\\\\\[type="submit"]:hover{
+
+\\\&#x20;   background:#1d4ed8;
+
+}
+
+
+
+a{
+
+\\\&#x20;   text-decoration:none;
+
+\\\&#x20;   color:white;
+
+\\\&#x20;   background:#10b981;
+
+\\\&#x20;   padding:12px 20px;
+
+\\\&#x20;   border-radius:10px;
+
+\\\&#x20;   display:inline-block;
+
+\\\&#x20;   font-weight:bold;
+
+}
+
+a:hover{
+
+\\\&#x20;   background:#059669;
+
+}
+
+
+
+.footer{
+
+\\\&#x20;   text-align:center;
+
+\\\&#x20;   color:white;
+
+\\\&#x20;   padding:20px;
+
+}
+
+
+
+
+</head>
+
+
+
+<body>
+
+
+
+<div class="header">
+
+\&#x20;   <div class="logo">☁ EduCloud Portal</div>
+
+\&#x20;   <div class="user">👤 Trainer / Student</div>
+
+</div>
+
+
+
+<div class="container">
+
+
+
+\&#x20;   <div class="sidebar">
+
+\&#x20;       <h3>Dashboard</h3>
+
+\&#x20;       <ul>
+
+\&#x20;           <li>📤 Upload Materials</li>
+
+\&#x20;           <li>📥 View Materials</li>
+
+\&#x20;           <li>📝 Submit Assignment</li>
+
+\&#x20;           <li>☁ Secure Cloud Portal</li>
+
+\&#x20;       </ul>
+
+\&#x20;   </div>
+
+
+
+\&#x20;   <div class="content">
+
+
+
+\&#x20;       <div class="welcome">
+
+\&#x20;           <h1>EduCloud Trainer Student Secure File Portal</h1>
+
+\&#x20;           <p>Cloud-Based Learning Management and Secure File Sharing Platform</p>
+
+\&#x20;       </div>
+
+
+
+\&#x20;       <div class="cards">
+
+
+
+\&#x20;           <div class="card">
+
+\&#x20;               <h2>📤 Trainer Upload Materials</h2>
+
+
+
+\&#x20;               <form action="upload.php" method="post" enctype="multipart/form-data">
+
+\&#x20;                   <input type="file" name="file">
+
+\&#x20;                   <br>
+
+\&#x20;                   <input type="submit" value="Upload">
+
+\&#x20;               </form>
+
+\&#x20;           </div>
+
+
+
+\&#x20;           <div class="card">
+
+\&#x20;               <h2>📥 Student Download Materials</h2>
+
+
+
+\&#x20;               <a href="materials.php">Click here to view materials</a>
+
+\&#x20;           </div>
+
+\&#x20;           <div class="card">
+
+\&#x20;               <h2>📝 Student Assignment Submission</h2>
+
+
+
+\&#x20;               <form action="submit.php" method="post" enctype="multipart/form-data">
+
+\&#x20;                   Student Name:
+
+\&#x20;                   <br><br>
+
+\&#x20;                   <input type="text" name="studentname">
+
+\&#x20;                   <br><br>
+
+
+
+\&#x20;                   <input type="file" name="assignment">
+
+\&#x20;                   <br>
+
+
+
+\&#x20;                   <input type="submit" value="Submit Assignment">
+
+\&#x20;               </form>
+
+\&#x20;           </div>
+
+
+
+\&#x20;       </div>
+
+
+
+\&#x20;   </div>
+
+
+
+</div>
+
+
+
+<div class="footer">
+
+\&#x20;   © EduCloud Secure Learning Platform
+
+</div>
+
+
+
+</body>
+
+</html>
+
+
+
+\\----------------------------
+
+upload.php
+
+\\----------------------------
+
+<?php
+
+
+
+// Turn on error reporting
+
+error\\\\\\\_reporting(E\\\\\\\_ALL);
+
+ini\\\\\\\_set('display\\\\\\\_errors', 1);
+
+
+
+require 'vendor/autoload.php';
+
+
+
+use Aws\\\\\\\\S3\\\\\\\\S3Client;
+
+
+
+// 1. Connect to AWS
+
+$s3 = new Aws\\\\\\\\S3\\\\\\\\S3Client(\\\\\\\[
+
+\\\&#x20;   'region'  => 'ap-south-1', // Change to your bucket region
+
+\\\&#x20;   'version' => 'latest'
+
+]);
+
+
+
+// 2. Tell PHP to treat "s3://" like a normal local directory
+
+$s3->registerStreamWrapper();
+
+
+
+// 3. Define the destination as an S3 path
+
+$target = "s3://educloud-materials-yourname/" . basename($\\\\\\\_FILES\\\\\\\["file"]\\\\\\\["name"]);
+
+
+
+$tempFile = $\\\\\\\_FILES\\\\\\\["file"]\\\\\\\["tmp\\\\\\\_name"];
+
+
+
+// 4. Use copy() instead of move\\\\\\\_uploaded\\\\\\\_file()
+
+if (is\\\\\\\_uploaded\\\\\\\_file($tempFile) \\\\\\\&\\\\\\\& copy($tempFile, $target)) {
+
+
+
+\\\&#x20;   echo "Uploaded directly to S3 successfully!";
+
+
+
+} else {
+
+
+
+\\\&#x20;   echo "Upload failed.";
+
+
+
+}
+
+
+
+
+
+
+\\----------------------------
+
+materials.php
+
+\\----------------------------
+
+<?php
+
+$files = scandir("/materials");
+
+foreach($files as $file){
+
+if($file != "." \\\\\\\&\\\\\\\& $file != ".."){
+
+echo "<a href='/downloads/$file'>$file</a><br>";
+
+}}
+
+
+
+
+\\----------------------------
+
+submit.php
+
+\\----------------------------
+
+<?php
+
+
+
+$student = htmlspecialchars($\\\\\\\_POST\\\\\\\['studentname']);
+
+$file = basename($\\\\\\\_FILES\\\\\\\["assignment"]\\\\\\\["name"]);
+
+
+
+if (substr($file, -7) != ".tar.gz") {
+
+\\\&#x20;   echo "Only .tar.gz files allowed";
+
+\\\&#x20;   exit;
+
+}
+
+
+
+$target = "/assignments/uploads/" . $file;
+
+
+
+if (move\\\\\\\_uploaded\\\\\\\_file($\\\\\\\_FILES\\\\\\\["assignment"]\\\\\\\["tmp\\\\\\\_name"], $target)) {
+
+
+
+\\\&#x20;   echo "Assignment submitted!";
+
+
+
+\\\&#x20;   $conn = new mysqli(
+
+\\\&#x20;       "educloud-db.cxcacsyaa0fu.ap-south-1.rds.amazonaws.com",
+
+\\\&#x20;       "admin",
+
+\\\&#x20;       "ShambuSadaShiva",
+
+\\\&#x20;       "educloud\\\\\\\_db"
+
+\\\&#x20;   );
+
+
+
+\\\&#x20;   if ($conn->connect\\\\\\\_error) {
+
+\\\&#x20;       exit;
+
+\\\&#x20;   }
+
+
+
+\\\&#x20;   $stmt = $conn->prepare(
+ 
+\\\&#x20;       "INSERT INTO uploads (filename, uploader) VALUES (?, ?)"
+
+\\\&#x20;   );
+
+
+
+\\\&#x20;   $stmt->bind\\\\\\\_param("ss", $file, $student);
+
+\\\&#x20;   $stmt->execute();
+
+
+
+\\\&#x20;   $stmt->close();
+
+\\\&#x20;   $conn->close();
+
+
+
+} else {
+
+\\\&#x20;   echo "Upload failed.";
+
+}
+
+
+
+
+\\----------------------------
+
+15\\. BIND MOUNT
+
+\\----------------------------
+
+sudo mkdir -p /var/www/html/downloads
+
+sudo mount --bind /materials /var/www/html/downloads
+
+
+
+sudo nano /etc/fstab
+
+/materials /var/www/html/downloads none bind 0 0
+
+\&#x20;
+
+\\----------------------------
+
+16\\. MYSQL
+
+\\----------------------------
+
+mysql -h RDS\\\_ENDPOINT -u admin -p
+
+
+
+USE educloud\\\_db;
+
+
+
+CREATE TABLE uploads (
+
+id INT AUTO\\\_INCREMENT PRIMARY KEY,
+
+filename VARCHAR(255),
+
+uploader VARCHAR(100)
+
+);
+
