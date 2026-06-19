@@ -1,5 +1,5 @@
 # EduCloud – Secure Cloud File Sharing System
-
+🎥 Complete Project Demonstration Available Below
 # Author
 
 Anil Vishwakarma N
@@ -15,9 +15,28 @@ The system uses AWS services like S3 for storing files, RDS for database managem
 Security is maintained using Linux permissions, ACL, IAM roles, and security groups, ensuring only authorized users can access the data.
 Overall, EduCloud is designed to be secure, scalable, and easy to use for both trainers and students.
 
-
 ---
 
+# Project Demonstration
+🎥 Project Demo Video
+
+▶️ Watch Demo:
+
+https://youtu.be/Og8fZmfB9js?si=28fQQO5r7buGovUt
+
+Demo Walkthrough
+Section	Time
+Title Page	00:00 - 00:42
+Architecture Diagram	00:43 - 02:18
+AWS Console & Infrastructure Overview	02:29 - 05:06
+Linux Server Configuration	05:07 - 09:22
+EduCloud Web Portal	09:23 - 12:33
+Conclusion	12:34 - 12:45
+
+This demonstration showcases the complete deployment of EduCloud on AWS, Linux administration, security implementation, automated backups, and the end-to-end workflow of the platform.
+
+
+---
 # Key Features
 
 * Role-based access (Trainer / Student / Support)
@@ -68,13 +87,14 @@ Overall, EduCloud is designed to be secure, scalable, and easy to use for both t
 
 # Workflow
 
-1. User accesses system via Load Balancer
-2. Request goes to private EC2 instance
-3. Trainer uploads materials → stored in S3
-4. S3 triggers Lambda → sends notification via SNS
-5. Students download materials
-6. Assignments stored and recorded in RDS
-7. Backup automated via cron jobs
+1. Users access the EduCloud portal
+2. Trainer uploads materials
+3. Materials are stored in Amazon S3
+4. Amazon S3 triggers AWS Lambda
+5. AWS Lambda sends notifications through Amazon SNS
+6. Students access and download materials
+7. Assignment records are stored in Amazon RDS
+8. Backups are automated using cron jobs
 
 ---
 
@@ -90,7 +110,6 @@ Overall, EduCloud is designed to be secure, scalable, and easy to use for both t
 # Documentation
 
 * EduCloud_Project_Report.pdf
-* EduCloud_Full_Screenshots.pdf
 
 ---
 
