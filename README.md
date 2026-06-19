@@ -27,12 +27,12 @@ https://youtu.be/Og8fZmfB9js?si=28fQQO5r7buGovUt
 Demo Walkthrough
 Section	Time
 
-Title Page	00:00 - 00:42
-Architecture Diagram	 00:43 - 02:18
-AWS Console & Infrastructure Overview	 02:29 - 05:06
-Linux Server Configuration	 05:07 - 09:22
-EduCloud Web Portal	 09:23 - 12:33
-Conclusion	 12:34 - 12:45
+* Title Page	00:00 - 00:42
+* Architecture Diagram	 00:43 - 02:18
+* AWS Console & Infrastructure Overview	 02:29 - 05:06
+* Linux Server Configuration	 05:07 - 09:22
+* EduCloud Web Portal	 09:23 - 12:33
+* Conclusion	 12:34 - 12:45
 
 This demonstration showcases the complete deployment of EduCloud on AWS, Linux administration, security implementation, automated backups, and the end-to-end workflow of the platform.
 
